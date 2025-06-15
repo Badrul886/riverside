@@ -1,0 +1,374 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and user management
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  name               String
+  avatarUrl          String?   @map("avatar_url")
+  role               UserRole  @default(USER)
+  subscriptionType   SubscriptionType @default(FREE) @map("subscription_type")
+  settings           Json      @default("{}")
+  isEmailVerified    Boolean   @default(false) @map("is_email_verified")
+  isActive           Boolean   @default(true) @map("is_active")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  ownedRooms         Room[]    @relation("RoomOwner")
+  roomParticipants   RoomParticipant[]
+  recordings         Recording[]
+  files              File[]
+  sentMessages       ChatMessage[] @relation("MessageSender")
+  oauthAccounts      OAuthAccount[]
+  sessions           Session[]
+  streamSessions     StreamSession[]
+
+  @@map("users")
+}
+
+// OAuth accounts for social login
+model OAuthAccount {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  accessToken       String? @map("access_token")
+  refreshToken      String? @map("refresh_token")
+  expiresAt         Int?    @map("expires_at")
+  tokenType         String? @map("token_type")
+  scope             String?
+  idToken           String? @map("id_token")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+// User sessions for JWT refresh tokens
+model Session {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  refreshToken String   @unique @map("refresh_token")
+  userAgent    String?  @map("user_agent")
+  ipAddress    String?  @map("ip_address")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Room model for video conference rooms
+model Room {
+  id              String     @id @default(cuid())
+  name            String
+  description     String?
+  ownerId         String     @map("owner_id")
+  roomCode        String     @unique @map("room_code")
+  maxParticipants Int        @default(10) @map("max_participants")
+  isPrivate       Boolean    @default(false) @map("is_private")
+  status          RoomStatus @default(WAITING)
+  settings        Json       @default("{}")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  endedAt         DateTime?  @map("ended_at")
+
+  // Relations
+  owner               User              @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  participants        RoomParticipant[]
+  recordings          Recording[]
+  chatMessages        ChatMessage[]
+  streamSessions      StreamSession[]
+  roomAnalytics       RoomAnalytics[]
+
+  @@map("rooms")
+}
+
+// Room participants tracking
+model RoomParticipant {
+  id          String            @id @default(cuid())
+  roomId      String            @map("room_id")
+  userId      String            @map("user_id")
+  displayName String?           @map("display_name")
+  role        ParticipantRole   @default(PARTICIPANT)
+  joinedAt    DateTime          @default(now()) @map("joined_at")
+  leftAt      DateTime?         @map("left_at")
+  isOnline    Boolean           @default(true) @map("is_online")
+  metadata    Json              @default("{}") // For storing connection quality, device info, etc.
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@map("room_participants")
+}
+
+// Recording model for storing video/audio recordings
+model Recording {
+  id                  String          @id @default(cuid())
+  roomId              String          @map("room_id")
+  participantId       String?         @map("participant_id")
+  fileName            String          @map("file_name")
+  filePath            String?         @map("file_path")
+  fileSize            BigInt?         @map("file_size")
+  duration            Int?            // Duration in seconds
+  thumbnailUrl        String?         @map("thumbnail_url")
+  downloadUrl         String?         @map("download_url")
+  status              RecordingStatus @default(UPLOADING)
+  processingProgress  Int             @default(0) @map("processing_progress")
+  recordingType       RecordingType   @default(LOCAL) @map("recording_type")
+  quality             VideoQuality    @default(MEDIUM)
+  metadata            Json            @default("{}")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  completedAt         DateTime?       @map("completed_at")
+
+  // Relations
+  room        Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  participant User? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+
+  @@map("recordings")
+}
+
+// File uploads (avatars, attachments, etc.)
+model File {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  fileName     String    @map("file_name")
+  originalName String    @map("original_name")
+  mimeType     String    @map("mime_type")
+  fileSize     BigInt    @map("file_size")
+  filePath     String    @map("file_path")
+  url          String
+  cdnUrl       String?   @map("cdn_url")
+  fileType     FileType  @map("file_type")
+  metadata     Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatMessages ChatMessage[]
+
+  @@map("files")
+}
+
+// Chat messages for in-room communication
+model ChatMessage {
+  id        String      @id @default(cuid())
+  roomId    String      @map("room_id")
+  senderId  String      @map("sender_id")
+  message   String
+  type      MessageType @default(TEXT)
+  fileId    String?     @map("file_id")
+  metadata  Json        @default("{}")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  room   Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender User  @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  file   File? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@map("chat_messages")
+}
+
+// Live streaming sessions
+model StreamSession {
+  id          String        @id @default(cuid())
+  roomId      String        @map("room_id")
+  userId      String        @map("user_id")
+  title       String
+  description String?
+  status      StreamStatus  @default(PREPARING)
+  quality     VideoQuality  @default(MEDIUM)
+  platforms   Json          @default("[]") // Array of streaming platforms
+  viewerCount Int           @default(0) @map("viewer_count")
+  startedAt   DateTime?     @map("started_at")
+  endedAt     DateTime?     @map("ended_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("stream_sessions")
+}
+
+// Analytics for rooms
+model RoomAnalytics {
+  id                    String   @id @default(cuid())
+  roomId                String   @map("room_id")
+  date                  DateTime @db.Date
+  totalDuration         Int      @default(0) @map("total_duration") // in minutes
+  peakParticipants      Int      @default(0) @map("peak_participants")
+  totalParticipants     Int      @default(0) @map("total_participants")
+  avgConnectionQuality  Float    @default(0) @map("avg_connection_quality")
+  bandwidthUpload       BigInt   @default(0) @map("bandwidth_upload")
+  bandwidthDownload     BigInt   @default(0) @map("bandwidth_download")
+  videoDrops            Int      @default(0) @map("video_drops")
+  audioDrops            Int      @default(0) @map("audio_drops")
+  reconnections         Int      @default(0)
+  deviceStats           Json     @default("{}") @map("device_stats")
+  browserStats          Json     @default("{}") @map("browser_stats")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, date])
+  @@map("room_analytics")
+}
+
+// User analytics and usage tracking
+model UserAnalytics {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  date              DateTime @db.Date
+  totalRoomsCreated Int      @default(0) @map("total_rooms_created")
+  totalRoomsJoined  Int      @default(0) @map("total_rooms_joined")
+  totalMinutesUsed  Int      @default(0) @map("total_minutes_used")
+  totalRecordings   Int      @default(0) @map("total_recordings")
+  storageUsed       BigInt   @default(0) @map("storage_used")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, date])
+  @@map("user_analytics")
+}
+
+// System notifications
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false) @map("is_read")
+  metadata  Json             @default("{}")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+// API rate limiting
+model RateLimit {
+  id        String   @id @default(cuid())
+  identifier String  // IP address or user ID
+  endpoint  String
+  requests  Int      @default(1)
+  windowStart DateTime @map("window_start")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([identifier, endpoint, windowStart])
+  @@map("rate_limits")
+}
+
+// WebRTC connection logs for debugging
+model WebRTCLog {
+  id            String   @id @default(cuid())
+  roomId        String   @map("room_id")
+  userId        String   @map("user_id")
+  eventType     String   @map("event_type")
+  eventData     Json     @map("event_data")
+  connectionId  String?  @map("connection_id")
+  timestamp     DateTime @default(now())
+
+  @@map("webrtc_logs")
+}
+
+// Enums
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum SubscriptionType {
+  FREE
+  PREMIUM
+  ENTERPRISE
+}
+
+enum RoomStatus {
+  WAITING
+  ACTIVE
+  ENDED
+  PAUSED
+}
+
+enum ParticipantRole {
+  HOST
+  MODERATOR
+  PARTICIPANT
+}
+
+enum RecordingStatus {
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum RecordingType {
+  LOCAL
+  SERVER
+  HYBRID
+}
+
+enum VideoQuality {
+  LOW      // 480p
+  MEDIUM   // 720p
+  HIGH     // 1080p
+  ULTRA    // 1440p+
+}
+
+enum FileType {
+  AVATAR
+  RECORDING
+  CHAT_ATTACHMENT
+  THUMBNAIL
+  DOCUMENT
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  EMOJI
+  SYSTEM
+}
+
+enum StreamStatus {
+  PREPARING
+  STREAMING
+  ENDED
+  FAILED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  ROOM_INVITE
+  RECORDING_READY
+}
