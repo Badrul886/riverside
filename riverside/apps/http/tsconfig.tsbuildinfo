@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/routes/v1/index.ts"],"version":"5.8.3"}
+{"root":["./src/index.ts","./src/routes/v1/analytics.route.ts","./src/routes/v1/auth.route.ts","./src/routes/v1/files.route.ts","./src/routes/v1/index.ts","./src/routes/v1/recordings.route.ts","./src/routes/v1/rooms.route.ts","./src/routes/v1/users.route.ts"],"version":"5.8.3"}
