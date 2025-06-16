@@ -3,16 +3,25 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -b",
-    "start": "node dist/index.js"
+    "build": "npx esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --tsconfig=tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "npm run build && npm run start"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@repo/db": "workspace:*",
     "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.9",
+    "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "typescript": "^5.8.3"
+    "jsonwebtoken": "^9.0.2",
+    "typescript": "^5.8.3",
+    "zod": "^3.25.64"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.5"
   }
 }

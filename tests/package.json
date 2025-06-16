@@ -1,16 +1,19 @@
 {
-  "name": "@repo/db",
+  "name": "tests",
   "version": "1.0.0",
   "main": "index.js",
-  "exports": {
-    "./client": "./src/index.js"
+  "scripts": {
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
+  "devDependencies": {
+    "jest": "^30.0.0"
+  },
   "dependencies": {
-    "@prisma/client": "^6.9.0",
-    "prisma": "^6.9.0"
+    "axios": "^1.10.0",
+    "dotenv": "^16.5.0"
   }
 }

@@ -1,7 +1,18 @@
 import express from 'express';
 import { router } from './routes/v1';
+// import client from '@repo/db/client'; // Adjust the import path based on your project structure
+
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load the env file from db package
+dotenv.config({ path: path.resolve(__dirname, '../../../packages/db/.env') });
+
+// ✅ Must come before any import that uses the Prisma client
+
 
 const app = express();
+app.use(express.json());
 
 app.use("/api/v1", router);
 
