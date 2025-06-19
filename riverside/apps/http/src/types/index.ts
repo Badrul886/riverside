@@ -227,3 +227,18 @@ export const StartLiveStreamSchema = z.object({
   description: z.string().optional(),
   quality: z.enum(["720p", "1080p", "1440p", "4k"]),
 });
+
+// Extend Express Request to include userId and role
+// This allows us to access req.userId and req.role in our middleware and routes
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+      role?: string;
+      user: {
+        id: string;
+        email: string;
+      };
+    }
+  }
+}

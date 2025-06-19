@@ -64,6 +64,21 @@ model OAuthAccount {
 }
 
 // User sessions for JWT refresh tokens
+// model Session {
+//   id           String   @id @default(cuid())
+//   userId       String   @map("user_id")
+//   refreshToken String   @unique @map("refresh_token")
+//   userAgent    String?  @map("user_agent")
+//   ipAddress    String?  @map("ip_address")
+//   expiresAt    DateTime @map("expires_at")
+//   createdAt    DateTime @default(now()) @map("created_at")
+
+//   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+//   @@map("sessions")
+// }
+
+// Update your Session model for refresh tokens
 model Session {
   id           String   @id @default(cuid())
   userId       String   @map("user_id")
@@ -72,9 +87,17 @@ model Session {
   ipAddress    String?  @map("ip_address")
   expiresAt    DateTime @map("expires_at")
   createdAt    DateTime @default(now()) @map("created_at")
+  revoked      Boolean  @default(false) // Add this field
+
+  // Add device fingerprint for enhanced security
+  deviceFingerprint String? @map("device_fingerprint")
+  
+  // Add token family for refresh token rotation
+  tokenFamily String? @map("token_family")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("sessions")
 }
 
